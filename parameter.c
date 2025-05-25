@@ -2,158 +2,108 @@
 #include <stdlib.h>
 #include <string.h>
 
-void init_parameter(Parameter *p, float value) {
+#define MAX_QUEUE 100
+
+void init_parameter(Parameter *p, float value)
+{
   p->value = value;
-  p->grad = 0.0;
-  p->op = "None";
-}
-
-void backward(Parameter *p) {
   p->grad = 1.0;
-  p->grad_fn(p);
+  p->prev = NULL;
 }
 
-void add_grad(Parameter *p) {
-  p->args[0]->grad += 1 * p->grad;
-  p->args[1]->grad += 1 * p->grad;
-}
-Parameter add(Parameter *p1, Parameter *p2) {
-  Parameter out;
-  out.value = p1->value + p2->value;
-  out.op = ADD;
-  out.args = (Parameter **)malloc(sizeof(Parameter *) * 2);
-  out.args[0] = p1;
-  out.args[1] = p2;
-  out.grad_fn = add_grad;
-  return out;
-}
-
-void add_num_grad(Parameter *p) {
-  p->args[0]->grad += 1 * p->grad;
-}
-Parameter add_num(Parameter *p1, float p2) {
-  Parameter out;
-  out.value = p1->value + p2;
-  out.op = ADD;
-  out.args = (Parameter **)malloc(sizeof(Parameter *) * 2);
-  out.args[0] = p1;
-  out.args[1] = NULL;
-  out.grad_fn = add_num_grad;
-  return out;
-}
-
-void sub_grad(Parameter *p) {
-  p->args[0]->grad -= 1 * p->grad;
-  p->args[1]->grad -= 1 * p->grad;
-}
-Parameter sub(Parameter *p1, Parameter *p2) {
-  Parameter out;
-  out.value = p1->value - p2->value;
-  out.op = SUB;
-  out.args = (Parameter **)malloc(sizeof(Parameter *) * 2);
-  out.args[0] = p1;
-  out.args[1] = p2;
-  out.grad_fn = sub_grad;
-  return out;
-}
-
-void sub_num_grad(Parameter *p) {
-  p->args[0]->grad -= 1 * p->grad;
-}
-Parameter sub_num(Parameter *p1, float p2) {
-  Parameter out;
-  out.value = p1->value - p2;
-  out.op = SUB;
-  out.args = (Parameter **)malloc(sizeof(Parameter *) * 2);
-  out.args[0] = p1;
-  out.args[1] = NULL;
-  out.grad_fn = sub_num_grad;
-  return out;
-}
-void zero_grad(Parameter *p) {
-  p->grad = 0.0f;
-  if (p->args[0] != NULL) {
-    zero_grad(p->args[0]);
-  }
-  if (p->args[1] != NULL) {
-    zero_grad(p->args[1]);
-  }
-}
-
-void mul_grad(Parameter *p) {
-  p->args[0]->grad += p->args[1]->value * p->grad;
-  p->args[1]->grad += p->args[0]->value * p->grad;
-}
-Parameter mult(Parameter *p1, Parameter *p2) {
-  Parameter out;
-  out.value = p1->value * p2->value;
-  out.args = (Parameter **)malloc(sizeof(Parameter *) * 2);
-  out.op = MULT;
-  out.args[0] = p1;
-  out.args[1] = p2;
-  out.grad_fn = mul_grad;
-  return out;
-}
-
-void mul_num_grad(Parameter *p) {
-  p->args[0]->grad += p->args[0]->cnst * p->grad;
-}
-Parameter mul_num(Parameter *p1, float p2) {
-  Parameter out;
-  out.value = p1->value * p2;
-  out.cnst = p2;
-  out.op = MULT;
-  out.args = (Parameter **)malloc(sizeof(Parameter *) * 2);
-  out.args[0] = p1;
-  out.args[1] = NULL;
-  out.grad_fn = mul_num_grad;
-  return out;
-}
-
-void div_grad(Parameter *p) {
-  float x = p->args[0]->value;
-  float y = p->args[1]->value;
-  float incoming_grad = p->grad;
-
-  p->args[0]->grad += (1.0f / y) * incoming_grad;
-  p->args[1]->grad += (-x / (y * y)) * incoming_grad;
-}
-Parameter divide(Parameter *p1, Parameter *p2) {
-  Parameter out;
-  out.op = DIVIDE;
-  out.value = p1->value / p2->value;
-  out.args = (Parameter **)malloc(sizeof(Parameter *) * 2);
-  out.args[0] = p1;
-  out.args[1] = p2;
-  out.grad_fn = div_grad;
-  return out;
-}
-
-void display(const Parameter *p) {
-  if (p == NULL) {
-    printf("Parameter: {NULL pointer}\n");
+void export_to_dot(Parameter *p, FILE *f, int *global_id)
+{
+  if (!p)
     return;
-  }
 
-  // Count arguments if args is not NULL and null-terminated
-  size_t arg_count = 0;
-  if (p->args != NULL) {
-    while (p->args[arg_count] != NULL) {
-      arg_count++;
+  int my_id = *global_id;
+  (*global_id)++;
+  fprintf(f, "  node%d [label=\"value=%.2f, grad=%.2f\"];\n", my_id, p->value,
+          p->grad);
+
+  if (p->prev) {
+    int op_id = (*global_id);
+    (*global_id)++;
+    const char *label = "?";
+    switch (p->prev->_op_name) {
+    case ADD:
+      label = "+";
+      break;
+    case MUL:
+      label = "*";
+      break;
+    case DIV:
+      label = "/";
+      break;
+    case POW:
+      label = "pow";
+      break;
+    }
+
+    fprintf(f, "  op%d [label=\"%s\", shape=ellipse];\n", op_id, label);
+    fprintf(f, "  op%d -> node%d;\n", op_id, my_id);
+
+    for (size_t i = 0; i < p->prev->n_inputs; i++) {
+      int input_id = *global_id;
+      export_to_dot(p->prev->inputs[i], f, global_id);
+      fprintf(f, "  node%d -> op%d;\n", input_id, op_id);
+    }
+  }
+}
+
+void topo_sort(Parameter *p, Parameter **sorted, int *index)
+{
+  if (!p || p->visited)
+    return;
+
+  p->visited = 1;
+
+  if (p->prev) {
+    for (size_t i = 0; i < p->prev->n_inputs; i++) {
+      topo_sort(p->prev->inputs[i], sorted, index);
     }
   }
 
-  // Display different formats based on whether op is set
-  if (p->op != NULL) {
-    if (p->args != NULL) {
-      printf("Parameter: {value: %e, grad: %e, op: %s, # args: %zu}\n",
-             p->value, p->grad, p->op, arg_count);
-    } else {
-      printf("Parameter: {value: %e, grad: %e, op: %s, # args: None}\n",
-             p->value, p->grad, p->op);
+  sorted[(*index)++] = p;
+}
+
+void backward(Parameter *p)
+{
+  Parameter *sorted[MAX_GRAPH_SIZE];
+  int idx;
+  idx = 0;
+  topo_sort(p, sorted, &idx);
+  p->grad = 1.0; // dp/dp
+
+  // traverse in reverse
+  for (int i = idx - 1; i >= 0; i--) {
+    if (sorted[i]->prev &&
+        sorted[i]->prev->backward_fn) { // if there was an operation perfomed
+      sorted[i]->prev->backward_fn(sorted[i]);
     }
-  } else {
-    printf("Parameter: {value: %e, grad: %e, op: ''}\n",
-           p->value, p->grad);
   }
+}
+
+void save_graph(Parameter *p, const char *filename)
+{
+  FILE *f = fopen(filename, "w");
+  fprintf(f, "digraph G {\n  rankdir=BT;\n");
+
+  int global_id = 0;
+  export_to_dot(p, f, &global_id);
+
+  fprintf(f, "}\n");
+  fclose(f);
+}
+
+int main(int argc, char *argv[])
+{
+  Parameter a, b, c, d;
+  init_parameter(&a, 3.0);
+  init_parameter(&b, 2.0);
+  OperationNode *addition_node = add(&a, &b, &c);
+  OperationNode *mult_node = mult(&c, &a, &d);
+  backward(&d);
+  save_graph(&d, "graph.dot");
+  return EXIT_SUCCESS;
 }
