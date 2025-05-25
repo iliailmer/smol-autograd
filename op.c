@@ -2,6 +2,9 @@
 
 void add_grad(Parameter *result)
 {
+  printf("inside add_grad, value=%.2f, grad=%.2f\n", result->value,
+         result->grad);
+
   result->prev->inputs[0]->grad += result->grad;
   result->prev->inputs[1]->grad += result->grad;
 }
@@ -30,11 +33,15 @@ OperationNode *add(Parameter *p1, Parameter *p2, Parameter *result)
 
   result->value = p1->value + p2->value;
   result->prev = add_node;
+  result->grad = 0.0;
+  result->visited = 0;
   return add_node;
 }
 
 void mult_grad(Parameter *result)
 {
+  printf("inside mult_grad, value=%.2f, grad=%.2f\n", result->value,
+         result->grad);
   result->prev->inputs[0]->grad +=
       result->grad * result->prev->inputs[1]->value;
   result->prev->inputs[1]->grad +=
@@ -65,5 +72,8 @@ OperationNode *mult(Parameter *p1, Parameter *p2, Parameter *result)
 
   result->value = p1->value * p2->value;
   result->prev = mult_node;
+  result->grad = 0.0;
+  result->visited = 0;
+
   return mult_node;
 }

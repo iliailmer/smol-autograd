@@ -3,23 +3,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Parameter quad(float a, float b, float c, Parameter x) {
-  // TODO: this function needs to be debugged, esp. gradient computation
-  Parameter sq = mult(&x, &x);
-  Parameter monom_1 = mul_num(&sq, a);
-  Parameter monom_2 = mul_num(&x, b);
-  Parameter res = add(&monom_1, &monom_2);
-  return add_num(&res, c);
-}
-
-float target_(float a, float b, float c, float d, float x) {
+float target_(float a, float b, float c, float d, float x)
+{
   return a * x * x * x * x + b * x * x * x + c * x * x + d * x;
 }
-float grad_target_(float a, float b, float c, float d, float x) {
+float grad_target_(float a, float b, float c, float d, float x)
+{
   return 4 * a * x * x * x + 3 * b * x * x + 2 * c * x + d;
 }
 
-float adam(float a, float b, float c, float d, float x, float lr, float beta1, float beta2, int num_iter, float tol, float eps) {
+float adam(float a, float b, float c, float d, float x, float lr, float beta1,
+           float beta2, int num_iter, float tol, float eps)
+{
   float m = 0;
   float m_hat = 0;
   float v = 0;
@@ -39,7 +34,8 @@ float adam(float a, float b, float c, float d, float x, float lr, float beta1, f
   return x;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   float a, b, c, d, x;
   a = 1;
   b = -2;
@@ -54,14 +50,5 @@ int main(int argc, char *argv[]) {
   float eps = 1e-8;
   x = adam(a, b, c, d, x, lr, beta1, beta2, num_iter, tol, eps);
   printf("\n\n\n\t\t\tResult: %e, f(%e)=%e", x, x, target_(a, b, c, d, x));
-  // Parameter x, y;
-  // init_parameter(&x, 1.);
-  // init_parameter(&y, 1.);
-  // Parameter s = add(&x, &y);
-  // Parameter quad_p = quad(a, b, c, x);
-
-  // backward(&quad_p);
-  // display(&quad_p);
-  // display(&x);
   return EXIT_SUCCESS;
 }

@@ -3,14 +3,14 @@ digraph G {
   node0 [label="value=15.00, grad=1.00"];
   op1 [label="*", shape=ellipse];
   op1 -> node0;
-  node2 [label="value=5.00, grad=0.00"];
+  node2 [label="value=5.00, grad=3.00"];
   op3 [label="+", shape=ellipse];
   op3 -> node2;
-  node4 [label="value=3.00, grad=1.00"];
+  node4 [label="value=3.00, grad=8.00"];
   node4 -> op3;
-  node5 [label="value=2.00, grad=1.00"];
+  node5 [label="value=2.00, grad=3.00"];
   node5 -> op3;
   node2 -> op1;
-  node6 [label="value=3.00, grad=1.00"];
+  node6 [label="value=3.00, grad=8.00"];
   node6 -> op1;
 }

@@ -7,8 +7,9 @@
 void init_parameter(Parameter *p, float value)
 {
   p->value = value;
-  p->grad = 1.0;
+  p->grad = 0.0;
   p->prev = NULL;
+  p->visited = 0;
 }
 
 void export_to_dot(Parameter *p, FILE *f, int *global_id)
@@ -64,17 +65,17 @@ void topo_sort(Parameter *p, Parameter **sorted, int *index)
     }
   }
 
-  sorted[(*index)++] = p;
+  sorted[(*index)] = p;
+  (*index)++;
 }
 
 void backward(Parameter *p)
 {
   Parameter *sorted[MAX_GRAPH_SIZE];
-  int idx;
-  idx = 0;
+  int idx = 0;
   topo_sort(p, sorted, &idx);
   p->grad = 1.0; // dp/dp
-
+  printf("idx=%d\n", idx);
   // traverse in reverse
   for (int i = idx - 1; i >= 0; i--) {
     if (sorted[i]->prev &&
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
   init_parameter(&b, 2.0);
   OperationNode *addition_node = add(&a, &b, &c);
   OperationNode *mult_node = mult(&c, &a, &d);
+  printf("d->visited=%d", d.visited);
   backward(&d);
   save_graph(&d, "graph.dot");
   return EXIT_SUCCESS;
