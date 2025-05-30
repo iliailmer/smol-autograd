@@ -99,13 +99,18 @@ void save_graph(Parameter *p, const char *filename)
 
 int main(int argc, char *argv[])
 {
-  Parameter a, b, c, d;
-  init_parameter(&a, 3.0);
-  init_parameter(&b, 2.0);
-  OperationNode *addition_node = add(&a, &b, &c);
-  OperationNode *mult_node = mult(&c, &a, &d);
-  printf("d->visited=%d", d.visited);
-  backward(&d);
-  save_graph(&d, "graph.dot");
+  // (a+b)*c^2/d;
+  Parameter a, b, c, d, sum, prod, powr, result;
+  init_parameter(&a, 4.0);
+  init_parameter(&b, 8.0);
+  init_parameter(&c, 6.0);
+  init_parameter(&d, 9.0);
+  init_parameter(&result, 0.0);
+  OperationNode *addition_node = add(&a, &b, &sum);
+  OperationNode *pow_node = power(&c, 2, &powr);
+  OperationNode *mult_node = mult(&sum, &powr, &prod);
+  OperationNode *div_node = divide(&prod, &d, &result);
+  backward(&result);
+  save_graph(&result, "graph.dot");
   return EXIT_SUCCESS;
 }

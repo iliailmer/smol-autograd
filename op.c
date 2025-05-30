@@ -1,4 +1,5 @@
 #include "parameter.h"
+#include <math.h>
 
 void add_grad(Parameter *result)
 {
@@ -35,6 +36,8 @@ OperationNode *add(Parameter *p1, Parameter *p2, Parameter *result)
   result->prev = add_node;
   result->grad = 0.0;
   result->visited = 0;
+  result->exponent = 1;
+
   return add_node;
 }
 
@@ -74,6 +77,86 @@ OperationNode *mult(Parameter *p1, Parameter *p2, Parameter *result)
   result->prev = mult_node;
   result->grad = 0.0;
   result->visited = 0;
+  result->exponent = 1;
 
   return mult_node;
+}
+void divide_grad(Parameter *result)
+{
+  printf("inside divide_grad, value=%.2f, grad=%.2f\n", result->value,
+         result->grad);
+  // numerator is idx 0
+  result->prev->inputs[0]->grad +=
+      result->grad / result->prev->inputs[1]->value;
+  // denominator is idx 1
+  result->prev->inputs[1]->grad +=
+      result->grad * result->prev->inputs[0]->value /
+      (result->prev->inputs[1]->value * result->prev->inputs[1]->value);
+}
+OperationNode *divide(Parameter *p1, Parameter *p2, Parameter *result)
+{
+  OperationNode *div_node = malloc(sizeof(OperationNode));
+  if (p1 == NULL) {
+    printf("Uninitialized or NULL parameter p1");
+    exit(1);
+  }
+  if (p2 == NULL) {
+    printf("Uninitialized or NULL parameter p2");
+    exit(1);
+  }
+  if (result == NULL) {
+    printf("Uninitialized or NULL parameter result");
+    exit(1);
+  }
+  div_node->_op_name = DIV;
+  div_node->_op_type = BINARY;
+  div_node->inputs = malloc(sizeof(Parameter *) * 2);
+  div_node->inputs[0] = p1;
+  div_node->inputs[1] = p2;
+  div_node->n_inputs = 2;
+  div_node->backward_fn = divide_grad;
+
+  result->value = p1->value / p2->value;
+  result->prev = div_node;
+  result->grad = 0.0;
+  result->visited = 0;
+  result->exponent = 1;
+
+  return div_node;
+}
+
+void pow_grad(Parameter *result)
+{
+  printf("inside pow_grad, value=%.2f, grad=%.2f\n", result->value,
+         result->grad);
+  int exponent = result->prev->inputs[0]->exponent;
+  result->prev->inputs[0]->grad +=
+      result->grad * exponent *
+      pow(result->prev->inputs[0]->value, exponent - 1);
+}
+OperationNode *power(Parameter *p1, int exponent, Parameter *result)
+{
+  OperationNode *pow_node = malloc(sizeof(OperationNode));
+  if (p1 == NULL) {
+    printf("Uninitialized or NULL parameter p1");
+    exit(1);
+  }
+  if (result == NULL) {
+    printf("Uninitialized or NULL parameter result");
+    exit(1);
+  }
+  pow_node->_op_name = POW;
+  pow_node->_op_type = UNARY;
+  pow_node->inputs = malloc(sizeof(Parameter *) * 1);
+  pow_node->inputs[0] = p1;
+  pow_node->n_inputs = 1;
+  pow_node->backward_fn = pow_grad;
+
+  result->value = pow(p1->value, exponent);
+  result->prev = pow_node;
+  result->grad = 0.0;
+  result->visited = 0;
+  result->exponent = exponent;
+
+  return pow_node;
 }

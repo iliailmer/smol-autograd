@@ -1,4 +1,5 @@
 // implementing Autograd (basic)
+// TODO: zero grad, relu, sigmoid, mse,
 #include <stdio.h>
 #include <stdlib.h>
 #ifndef PARAMETER_H
@@ -10,7 +11,8 @@ typedef struct Parameter {
   float value;
   float grad;
   struct OperationNode *prev;
-  int visited; // will be used for topological sort;
+  int visited;  // will be used for topological sort;
+  int exponent; // for the pow operation
 } Parameter;
 
 typedef struct OperationNode {
@@ -25,6 +27,8 @@ typedef struct OperationNode {
 void init_parameter(Parameter *p, float value);
 OperationNode *add(Parameter *p1, Parameter *p2, Parameter *result);
 OperationNode *mult(Parameter *p1, Parameter *p2, Parameter *result);
+OperationNode *divide(Parameter *p1, Parameter *p2, Parameter *result);
+OperationNode *power(Parameter *p1, int exponent, Parameter *result);
 
 void backward(Parameter *p);
 void save_graph(Parameter *p, const char *filename);
