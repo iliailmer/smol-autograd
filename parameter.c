@@ -10,6 +10,7 @@ void init_parameter(Parameter *p, float value)
   p->grad = 0.0;
   p->prev = NULL;
   p->visited = 0;
+  p->exponent = 1;
 }
 
 void export_to_dot(Parameter *p, FILE *f, int *global_id)
@@ -38,6 +39,9 @@ void export_to_dot(Parameter *p, FILE *f, int *global_id)
       break;
     case POW:
       label = "pow";
+      break;
+    case EXP:
+      label = "exp";
       break;
     }
 
@@ -100,17 +104,19 @@ void save_graph(Parameter *p, const char *filename)
 int main(int argc, char *argv[])
 {
   // (a+b)*c^2/d;
-  Parameter a, b, c, d, sum, prod, powr, result;
-  init_parameter(&a, 4.0);
-  init_parameter(&b, 8.0);
-  init_parameter(&c, 6.0);
-  init_parameter(&d, 9.0);
-  init_parameter(&result, 0.0);
-  OperationNode *addition_node = add(&a, &b, &sum);
-  OperationNode *pow_node = power(&c, 2, &powr);
-  OperationNode *mult_node = mult(&sum, &powr, &prod);
-  OperationNode *div_node = divide(&prod, &d, &result);
+  Parameter w11, w12, w21, w22, b1, b2, x1, x2, y1, y2, y_hat1, y_hat2, result;
+  init_parameter(&w11, 1.0);
+  init_parameter(&w12, 1.0);
+  init_parameter(&w21, 1.0);
+  init_parameter(&w22, 1.0);
+  init_parameter(&b1, 1.0);
+  init_parameter(&b2, 1.0);
+  init_parameter(&x1, 1.0);
+  init_parameter(&x2, 1.0);
+  init_parameter(&y1, 0.0);
+  init_parameter(&y2, 1.0);
+
+  OperationNode *prod = mult(&w11, &x1, &result);
   backward(&result);
-  save_graph(&result, "graph.dot");
   return EXIT_SUCCESS;
 }

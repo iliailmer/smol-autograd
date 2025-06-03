@@ -5,7 +5,7 @@
 #ifndef PARAMETER_H
 #define PARAMETER_H
 typedef enum { BINARY, UNARY } op_type;
-typedef enum { ADD, MUL, DIV, POW } op_name;
+typedef enum { ADD, MUL, DIV, POW, EXP, TANH, RELU } op_name;
 
 typedef struct Parameter {
   float value;
@@ -29,6 +29,7 @@ OperationNode *add(Parameter *p1, Parameter *p2, Parameter *result);
 OperationNode *mult(Parameter *p1, Parameter *p2, Parameter *result);
 OperationNode *divide(Parameter *p1, Parameter *p2, Parameter *result);
 OperationNode *power(Parameter *p1, int exponent, Parameter *result);
+OperationNode *exp_(Parameter *p1, Parameter *result);
 
 void backward(Parameter *p);
 void save_graph(Parameter *p, const char *filename);

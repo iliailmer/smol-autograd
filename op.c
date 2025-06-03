@@ -1,3 +1,4 @@
+// TODO: Subtraction, negation
 #include "parameter.h"
 #include <math.h>
 
@@ -146,7 +147,7 @@ OperationNode *power(Parameter *p1, int exponent, Parameter *result)
     exit(1);
   }
   pow_node->_op_name = POW;
-  pow_node->_op_type = UNARY;
+  pow_node->_op_type = BINARY;
   pow_node->inputs = malloc(sizeof(Parameter *) * 1);
   pow_node->inputs[0] = p1;
   pow_node->n_inputs = 1;
@@ -159,4 +160,60 @@ OperationNode *power(Parameter *p1, int exponent, Parameter *result)
   result->exponent = exponent;
 
   return pow_node;
+}
+
+void exp_grad(Parameter *result)
+{
+  printf("inside exp_grad, value=%.2f, grad=%.2f\n", result->value,
+         result->grad);
+  result->prev->inputs[0]->grad += exp(result->prev->inputs[0]->value);
+}
+OperationNode *exp_(Parameter *p1, Parameter *result)
+{
+
+  OperationNode *exp_node = malloc(sizeof(OperationNode));
+  if (p1 == NULL) {
+    printf("Uninitialized or NULL parameter p1");
+    exit(1);
+  }
+  if (result == NULL) {
+    printf("Uninitialized or NULL parameter result");
+    exit(1);
+  }
+  exp_node->_op_name = EXP;
+  exp_node->_op_type = UNARY;
+  exp_node->backward_fn = exp_grad;
+  exp_node->inputs = malloc(sizeof(Parameter *) * 1);
+  exp_node->inputs[0] = p1;
+  exp_node->n_inputs = 1;
+
+  result->value = exp(p1->value);
+  result->prev = exp_node;
+  result->grad = 0.0;
+  result->visited = 0;
+  result->exponent = 1;
+  return exp_node;
+}
+
+void tanh_grad(Parameter *result)
+{
+  float tanh_value = tanh(result->prev->inputs[0]->value);
+  result->prev->inputs[0]->grad += result->grad * (1 - tanh_value * tanh_value);
+}
+OperationNode *tanh_(Parameter *p1, Parameter *result)
+{
+  OperationNode *tanh_node = malloc(sizeof(OperationNode));
+  tanh_node->_op_name = TANH;
+  tanh_node->_op_type = UNARY;
+  tanh_node->backward_fn = tanh_grad;
+  tanh_node->inputs = malloc(sizeof(Parameter *) * 1);
+  tanh_node->inputs[0] = p1;
+  tanh_node->n_inputs = 1;
+
+  result->value = tanh(p1->value);
+  result->exponent = 1;
+  result->grad = 0.0;
+  result->visited = 0;
+  result->prev = tanh_node;
+  return tanh_node;
 }
