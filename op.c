@@ -1,11 +1,15 @@
-// TODO: Subtraction, negation
 #include "parameter.h"
 #include <math.h>
 
 void add_grad(Parameter *result)
 {
-  printf("inside add_grad, value=%.2f, grad=%.2f\n", result->value,
-         result->grad);
+  if (!result || !result->prev || !result->prev->inputs[0] ||
+      !result->prev->inputs[1]) {
+    fprintf(stderr, "Null pointer in add_grad!\n");
+    exit(1);
+  }
+  printf("inside add_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
+         result->grad, result->exponent);
 
   result->prev->inputs[0]->grad += result->grad;
   result->prev->inputs[1]->grad += result->grad;
@@ -42,10 +46,84 @@ OperationNode *add(Parameter *p1, Parameter *p2, Parameter *result)
   return add_node;
 }
 
+void sub_grad(Parameter *result)
+{
+  printf("inside sub_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
+         result->grad, result->exponent);
+
+  result->prev->inputs[0]->grad += result->grad;
+  result->prev->inputs[1]->grad -= result->grad;
+}
+OperationNode *sub(Parameter *p1, Parameter *p2, Parameter *result)
+{
+  OperationNode *sub_node = malloc(sizeof(OperationNode));
+  if (p1 == NULL) {
+    printf("Uninitialized or NULL parameter p1");
+    exit(1);
+  }
+  if (p2 == NULL) {
+    printf("Uninitialized or NULL parameter p2");
+    exit(1);
+  }
+  if (result == NULL) {
+    printf("Uninitialized or NULL parameter result");
+    exit(1);
+  }
+  sub_node->_op_name = SUB;
+  sub_node->_op_type = BINARY;
+  sub_node->inputs = malloc(sizeof(Parameter *) * 2);
+  sub_node->inputs[0] = p1;
+  sub_node->inputs[1] = p2;
+  sub_node->n_inputs = 2;
+  sub_node->backward_fn = sub_grad;
+
+  result->value = p1->value - p2->value;
+  result->prev = sub_node;
+  result->grad = 0.0;
+  result->visited = 0;
+  result->exponent = 1;
+
+  return sub_node;
+}
+
+void neg_grad(Parameter *result)
+{
+  printf("inside neg_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
+         result->grad, result->exponent);
+
+  result->prev->inputs[0]->grad -= result->grad;
+}
+OperationNode *neg(Parameter *p1, Parameter *result)
+{
+  OperationNode *neg_node = malloc(sizeof(OperationNode));
+  if (p1 == NULL) {
+    printf("Uninitialized or NULL parameter p1");
+    exit(1);
+  }
+  if (result == NULL) {
+    printf("Uninitialized or NULL parameter result");
+    exit(1);
+  }
+  neg_node->_op_name = NEG;
+  neg_node->_op_type = UNARY;
+  neg_node->inputs = malloc(sizeof(Parameter *) * 2);
+  neg_node->inputs[0] = p1;
+  neg_node->n_inputs = 1;
+  neg_node->backward_fn = neg_grad;
+
+  result->value = (-1) * p1->value;
+  result->prev = neg_node;
+  result->grad = 0.0;
+  result->visited = 0;
+  result->exponent = 1;
+
+  return neg_node;
+}
+
 void mult_grad(Parameter *result)
 {
-  printf("inside mult_grad, value=%.2f, grad=%.2f\n", result->value,
-         result->grad);
+  printf("inside mult_grad, value=%.2f, grad=%.2f, exponent=%d, op_name=%d\n",
+         result->value, result->grad, result->exponent, result->prev->_op_name);
   result->prev->inputs[0]->grad +=
       result->grad * result->prev->inputs[1]->value;
   result->prev->inputs[1]->grad +=
@@ -84,8 +162,8 @@ OperationNode *mult(Parameter *p1, Parameter *p2, Parameter *result)
 }
 void divide_grad(Parameter *result)
 {
-  printf("inside divide_grad, value=%.2f, grad=%.2f\n", result->value,
-         result->grad);
+  printf("inside divide_grad, value=%.2f, grad=%.2f, exponent=%d\n",
+         result->value, result->grad, result->exponent);
   // numerator is idx 0
   result->prev->inputs[0]->grad +=
       result->grad / result->prev->inputs[1]->value;
@@ -128,8 +206,8 @@ OperationNode *divide(Parameter *p1, Parameter *p2, Parameter *result)
 
 void pow_grad(Parameter *result)
 {
-  printf("inside pow_grad, value=%.2f, grad=%.2f\n", result->value,
-         result->grad);
+  printf("inside pow_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
+         result->grad, result->exponent);
   int exponent = result->prev->inputs[0]->exponent;
   result->prev->inputs[0]->grad +=
       result->grad * exponent *
@@ -166,7 +244,8 @@ void exp_grad(Parameter *result)
 {
   printf("inside exp_grad, value=%.2f, grad=%.2f\n", result->value,
          result->grad);
-  result->prev->inputs[0]->grad += exp(result->prev->inputs[0]->value);
+  result->prev->inputs[0]->grad +=
+      exp(result->prev->inputs[0]->value) * result->grad;
 }
 OperationNode *exp_(Parameter *p1, Parameter *result)
 {
@@ -217,3 +296,29 @@ OperationNode *tanh_(Parameter *p1, Parameter *result)
   result->prev = tanh_node;
   return tanh_node;
 }
+
+void relu_grad(Parameter *result)
+{
+  float val = result->prev->inputs[0]->value;
+  float relu_deriv = val > 0.0 ? 1.0 : 0.0;
+  result->prev->inputs[0]->grad += result->grad * (relu_deriv);
+}
+OperationNode *relu_(Parameter *p1, Parameter *result)
+{
+  OperationNode *relu_node = malloc(sizeof(OperationNode));
+  relu_node->_op_name = RELU;
+  relu_node->_op_type = UNARY;
+  relu_node->backward_fn = relu_grad;
+  relu_node->inputs = malloc(sizeof(Parameter *) * 1);
+  relu_node->inputs[0] = p1;
+  relu_node->n_inputs = 1;
+
+  result->value = (p1->value > 0) ? p1->value : 0.0;
+  result->exponent = 1;
+  result->grad = 0.0;
+  result->visited = 0;
+  result->prev = relu_node;
+  return relu_node;
+}
+
+void matmul(Tensor *t1, Tensor *t2) {}

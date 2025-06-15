@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_QUEUE 100
-
 void init_parameter(Parameter *p, float value)
 {
   p->value = value;
@@ -13,23 +11,27 @@ void init_parameter(Parameter *p, float value)
   p->exponent = 1;
 }
 
-void export_to_dot(Parameter *p, FILE *f, int *global_id)
+int export_to_dot(Parameter *p, FILE *f, int *global_id)
 {
   if (!p)
-    return;
+    return -1;
 
-  int my_id = *global_id;
-  (*global_id)++;
+  int my_id = (*global_id)++;
   fprintf(f, "  node%d [label=\"value=%.2f, grad=%.2f\"];\n", my_id, p->value,
           p->grad);
 
   if (p->prev) {
-    int op_id = (*global_id);
-    (*global_id)++;
+    int op_id = (*global_id)++;
     const char *label = "?";
     switch (p->prev->_op_name) {
     case ADD:
       label = "+";
+      break;
+    case SUB:
+      label = "-";
+      break;
+    case NEG:
+      label = "-1";
       break;
     case MUL:
       label = "*";
@@ -40,6 +42,12 @@ void export_to_dot(Parameter *p, FILE *f, int *global_id)
     case POW:
       label = "pow";
       break;
+    case TANH:
+      label = "tanh";
+      break;
+    case RELU:
+      label = "relu";
+      break;
     case EXP:
       label = "exp";
       break;
@@ -49,11 +57,13 @@ void export_to_dot(Parameter *p, FILE *f, int *global_id)
     fprintf(f, "  op%d -> node%d;\n", op_id, my_id);
 
     for (size_t i = 0; i < p->prev->n_inputs; i++) {
-      int input_id = *global_id;
-      export_to_dot(p->prev->inputs[i], f, global_id);
-      fprintf(f, "  node%d -> op%d;\n", input_id, op_id);
+      int input_id = export_to_dot(p->prev->inputs[i], f, global_id);
+      if (input_id != -1)
+        fprintf(f, "  node%d -> op%d;\n", input_id, op_id);
     }
   }
+
+  return my_id;
 }
 
 void topo_sort(Parameter *p, Parameter **sorted, int *index)
@@ -103,20 +113,71 @@ void save_graph(Parameter *p, const char *filename)
 
 int main(int argc, char *argv[])
 {
-  // (a+b)*c^2/d;
-  Parameter w11, w12, w21, w22, b1, b2, x1, x2, y1, y2, y_hat1, y_hat2, result;
-  init_parameter(&w11, 1.0);
-  init_parameter(&w12, 1.0);
-  init_parameter(&w21, 1.0);
-  init_parameter(&w22, 1.0);
-  init_parameter(&b1, 1.0);
-  init_parameter(&b2, 1.0);
-  init_parameter(&x1, 1.0);
-  init_parameter(&x2, 1.0);
-  init_parameter(&y1, 0.0);
-  init_parameter(&y2, 1.0);
+  Parameter w1[2][2], w2[2][2], b1[2], b2[2], x[2], y[2], y_hat[2];
+  Parameter h1[2];
+  init_parameter(&y[0], 1.0);
+  init_parameter(&y[1], 4.0);
+  init_parameter(&y_hat[0], 1.0);
+  init_parameter(&y_hat[1], 4.0);
+  init_parameter(&x[0], 1.0);
+  init_parameter(&x[1], 2.0);
+  for (size_t i = 0; i < 2; i++) {
+    init_parameter(&b1[i], 1.0);
+    init_parameter(&b2[i], 1.0);
+    init_parameter(&h1[i], 1.0);
+    for (size_t j = 0; j < 2; j++) {
+      init_parameter(&w1[i][j], 1.0);
+      init_parameter(&w2[i][j], 1.0);
+    }
+  }
+  // forward pass
+  // first layer
+  for (size_t i = 0; i < 2; i++) {
+    Parameter sum;
+    init_parameter(&sum, 0.0); // sum = 0
+    for (size_t j = 0; j < 2; j++) {
+      Parameter prod;
+      init_parameter(&prod, 0.0);
+      mult(&w1[i][j], &x[j], &prod); // prod =  w[i,j] * x[j]
+      Parameter new_sum;
+      init_parameter(&new_sum, 0.0);
+      add(&prod, &sum, &new_sum);
+      sum = new_sum; // safe copy
+    }
+    Parameter biased_sum;
+    add(&sum, &b1[i], &biased_sum);
+    tanh_(&biased_sum, &h1[i]);
+  }
+  // second layer
 
-  OperationNode *prod = mult(&w11, &x1, &result);
-  backward(&result);
+  for (size_t i = 0; i < 2; i++) {
+    Parameter sum;
+    init_parameter(&sum, 0.0); // sum = 0
+    for (size_t j = 0; j < 2; j++) {
+      Parameter prod;
+      init_parameter(&prod, 0.0);
+      mult(&w2[i][j], &h1[j], &prod); // prod =  w[i,j] * x[j]
+      Parameter new_sum;
+      init_parameter(&new_sum, 0.0);
+      add(&prod, &sum, &new_sum);
+      sum = new_sum; // safe copy
+    }
+    add(&sum, &b2[i], &y_hat[i]); // y_hat[i] = sum + b2[i]
+  }
+
+  // calculate loss
+  Parameter loss;
+  init_parameter(&loss, 0.0f);
+  for (size_t i = 0; i < 2; i++) {
+    Parameter diff;
+    sub(&y[i], &y_hat[i], &diff);
+    Parameter pow_diff;
+    power(&diff, 2, &pow_diff);
+    Parameter new_loss;
+    add(&loss, &pow_diff, &new_loss);
+    loss = new_loss;
+  }
+  backward(&loss);
+  save_graph(&loss, "graph.dot");
   return EXIT_SUCCESS;
 }
