@@ -5,33 +5,32 @@ void add_grad(Parameter *result)
 {
   if (!result || !result->prev || !result->prev->inputs[0] ||
       !result->prev->inputs[1]) {
-    fprintf(stderr, "Null pointer in add_grad!\n");
-    exit(1);
+    return;
   }
-  printf("inside add_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
-         result->grad, result->exponent);
 
   result->prev->inputs[0]->grad += result->grad;
   result->prev->inputs[1]->grad += result->grad;
 }
-OperationNode *add(Parameter *p1, Parameter *p2, Parameter *result)
+
+adam_error_t add(Parameter *p1, Parameter *p2, Parameter *result)
 {
+  if (!p1 || !p2 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
   OperationNode *add_node = malloc(sizeof(OperationNode));
-  if (p1 == NULL) {
-    printf("Uninitialized or NULL parameter p1");
-    exit(1);
+  if (!add_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (p2 == NULL) {
-    printf("Uninitialized or NULL parameter p2");
-    exit(1);
+  
+  add_node->inputs = malloc(sizeof(Parameter *) * 2);
+  if (!add_node->inputs) {
+    free(add_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (result == NULL) {
-    printf("Uninitialized or NULL parameter result");
-    exit(1);
-  }
+  
   add_node->_op_name = ADD;
   add_node->_op_type = BINARY;
-  add_node->inputs = malloc(sizeof(Parameter *) * 2);
   add_node->inputs[0] = p1;
   add_node->inputs[1] = p2;
   add_node->n_inputs = 2;
@@ -43,35 +42,39 @@ OperationNode *add(Parameter *p1, Parameter *p2, Parameter *result)
   result->visited = 0;
   result->exponent = 1;
 
-  return add_node;
+  return ADAM_SUCCESS;
 }
 
 void sub_grad(Parameter *result)
 {
-  printf("inside sub_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
-         result->grad, result->exponent);
+  if (!result || !result->prev || !result->prev->inputs[0] ||
+      !result->prev->inputs[1]) {
+    return;
+  }
 
   result->prev->inputs[0]->grad += result->grad;
   result->prev->inputs[1]->grad -= result->grad;
 }
-OperationNode *sub(Parameter *p1, Parameter *p2, Parameter *result)
+
+adam_error_t sub(Parameter *p1, Parameter *p2, Parameter *result)
 {
+  if (!p1 || !p2 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
   OperationNode *sub_node = malloc(sizeof(OperationNode));
-  if (p1 == NULL) {
-    printf("Uninitialized or NULL parameter p1");
-    exit(1);
+  if (!sub_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (p2 == NULL) {
-    printf("Uninitialized or NULL parameter p2");
-    exit(1);
+  
+  sub_node->inputs = malloc(sizeof(Parameter *) * 2);
+  if (!sub_node->inputs) {
+    free(sub_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (result == NULL) {
-    printf("Uninitialized or NULL parameter result");
-    exit(1);
-  }
+  
   sub_node->_op_name = SUB;
   sub_node->_op_type = BINARY;
-  sub_node->inputs = malloc(sizeof(Parameter *) * 2);
   sub_node->inputs[0] = p1;
   sub_node->inputs[1] = p2;
   sub_node->n_inputs = 2;
@@ -83,30 +86,37 @@ OperationNode *sub(Parameter *p1, Parameter *p2, Parameter *result)
   result->visited = 0;
   result->exponent = 1;
 
-  return sub_node;
+  return ADAM_SUCCESS;
 }
 
 void neg_grad(Parameter *result)
 {
-  printf("inside neg_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
-         result->grad, result->exponent);
+  if (!result || !result->prev || !result->prev->inputs[0]) {
+    return;
+  }
 
   result->prev->inputs[0]->grad -= result->grad;
 }
-OperationNode *neg(Parameter *p1, Parameter *result)
+
+adam_error_t neg(Parameter *p1, Parameter *result)
 {
+  if (!p1 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
   OperationNode *neg_node = malloc(sizeof(OperationNode));
-  if (p1 == NULL) {
-    printf("Uninitialized or NULL parameter p1");
-    exit(1);
+  if (!neg_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (result == NULL) {
-    printf("Uninitialized or NULL parameter result");
-    exit(1);
+  
+  neg_node->inputs = malloc(sizeof(Parameter *) * 1);
+  if (!neg_node->inputs) {
+    free(neg_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
+  
   neg_node->_op_name = NEG;
   neg_node->_op_type = UNARY;
-  neg_node->inputs = malloc(sizeof(Parameter *) * 2);
   neg_node->inputs[0] = p1;
   neg_node->n_inputs = 1;
   neg_node->backward_fn = neg_grad;
@@ -117,36 +127,41 @@ OperationNode *neg(Parameter *p1, Parameter *result)
   result->visited = 0;
   result->exponent = 1;
 
-  return neg_node;
+  return ADAM_SUCCESS;
 }
 
 void mult_grad(Parameter *result)
 {
-  printf("inside mult_grad, value=%.2f, grad=%.2f, exponent=%d, op_name=%d\n",
-         result->value, result->grad, result->exponent, result->prev->_op_name);
+  if (!result || !result->prev || !result->prev->inputs[0] ||
+      !result->prev->inputs[1]) {
+    return;
+  }
+  
   result->prev->inputs[0]->grad +=
       result->grad * result->prev->inputs[1]->value;
   result->prev->inputs[1]->grad +=
       result->grad * result->prev->inputs[0]->value;
 }
-OperationNode *mult(Parameter *p1, Parameter *p2, Parameter *result)
+
+adam_error_t mult(Parameter *p1, Parameter *p2, Parameter *result)
 {
+  if (!p1 || !p2 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
   OperationNode *mult_node = malloc(sizeof(OperationNode));
-  if (p1 == NULL) {
-    printf("Uninitialized or NULL parameter p1");
-    exit(1);
+  if (!mult_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (p2 == NULL) {
-    printf("Uninitialized or NULL parameter p2");
-    exit(1);
+  
+  mult_node->inputs = malloc(sizeof(Parameter *) * 2);
+  if (!mult_node->inputs) {
+    free(mult_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (result == NULL) {
-    printf("Uninitialized or NULL parameter result");
-    exit(1);
-  }
+  
   mult_node->_op_name = MUL;
   mult_node->_op_type = BINARY;
-  mult_node->inputs = malloc(sizeof(Parameter *) * 2);
   mult_node->inputs[0] = p1;
   mult_node->inputs[1] = p2;
   mult_node->n_inputs = 2;
@@ -158,38 +173,50 @@ OperationNode *mult(Parameter *p1, Parameter *p2, Parameter *result)
   result->visited = 0;
   result->exponent = 1;
 
-  return mult_node;
+  return ADAM_SUCCESS;
 }
 void divide_grad(Parameter *result)
 {
-  printf("inside divide_grad, value=%.2f, grad=%.2f, exponent=%d\n",
-         result->value, result->grad, result->exponent);
+  if (!result || !result->prev || !result->prev->inputs[0] ||
+      !result->prev->inputs[1]) {
+    return;
+  }
+  
+  float denom = result->prev->inputs[1]->value;
+  if (denom == 0.0f) {
+    return; // Avoid division by zero in gradient
+  }
+  
   // numerator is idx 0
-  result->prev->inputs[0]->grad +=
-      result->grad / result->prev->inputs[1]->value;
+  result->prev->inputs[0]->grad += result->grad / denom;
   // denominator is idx 1
   result->prev->inputs[1]->grad +=
-      result->grad * result->prev->inputs[0]->value /
-      (result->prev->inputs[1]->value * result->prev->inputs[1]->value);
+      result->grad * result->prev->inputs[0]->value / (denom * denom);
 }
-OperationNode *divide(Parameter *p1, Parameter *p2, Parameter *result)
+
+adam_error_t divide(Parameter *p1, Parameter *p2, Parameter *result)
 {
+  if (!p1 || !p2 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
+  if (p2->value == 0.0f) {
+    return ADAM_ERROR_DIVISION_BY_ZERO;
+  }
+  
   OperationNode *div_node = malloc(sizeof(OperationNode));
-  if (p1 == NULL) {
-    printf("Uninitialized or NULL parameter p1");
-    exit(1);
+  if (!div_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (p2 == NULL) {
-    printf("Uninitialized or NULL parameter p2");
-    exit(1);
+  
+  div_node->inputs = malloc(sizeof(Parameter *) * 2);
+  if (!div_node->inputs) {
+    free(div_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (result == NULL) {
-    printf("Uninitialized or NULL parameter result");
-    exit(1);
-  }
+  
   div_node->_op_name = DIV;
   div_node->_op_type = BINARY;
-  div_node->inputs = malloc(sizeof(Parameter *) * 2);
   div_node->inputs[0] = p1;
   div_node->inputs[1] = p2;
   div_node->n_inputs = 2;
@@ -201,32 +228,49 @@ OperationNode *divide(Parameter *p1, Parameter *p2, Parameter *result)
   result->visited = 0;
   result->exponent = 1;
 
-  return div_node;
+  return ADAM_SUCCESS;
 }
 
 void pow_grad(Parameter *result)
 {
-  printf("inside pow_grad, value=%.2f, grad=%.2f, exponent=%d\n", result->value,
-         result->grad, result->exponent);
-  int exponent = result->prev->inputs[0]->exponent;
+  if (!result || !result->prev || !result->prev->inputs[0]) {
+    return;
+  }
+  
+  int exponent = result->exponent;
+  if (exponent == 0) {
+    return; // derivative of constant is 0
+  }
+  
   result->prev->inputs[0]->grad +=
       result->grad * exponent *
       pow(result->prev->inputs[0]->value, exponent - 1);
 }
-OperationNode *power(Parameter *p1, int exponent, Parameter *result)
+
+adam_error_t power(Parameter *p1, int exponent, Parameter *result)
 {
+  if (!p1 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
+  // Check for invalid power operations
+  if (p1->value < 0 && exponent != (int)exponent) {
+    return ADAM_ERROR_INVALID_INPUT;
+  }
+  
   OperationNode *pow_node = malloc(sizeof(OperationNode));
-  if (p1 == NULL) {
-    printf("Uninitialized or NULL parameter p1");
-    exit(1);
+  if (!pow_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (result == NULL) {
-    printf("Uninitialized or NULL parameter result");
-    exit(1);
-  }
-  pow_node->_op_name = POW;
-  pow_node->_op_type = BINARY;
+  
   pow_node->inputs = malloc(sizeof(Parameter *) * 1);
+  if (!pow_node->inputs) {
+    free(pow_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
+  }
+  
+  pow_node->_op_name = POW;
+  pow_node->_op_type = UNARY;
   pow_node->inputs[0] = p1;
   pow_node->n_inputs = 1;
   pow_node->backward_fn = pow_grad;
@@ -237,32 +281,39 @@ OperationNode *power(Parameter *p1, int exponent, Parameter *result)
   result->visited = 0;
   result->exponent = exponent;
 
-  return pow_node;
+  return ADAM_SUCCESS;
 }
 
 void exp_grad(Parameter *result)
 {
-  printf("inside exp_grad, value=%.2f, grad=%.2f\n", result->value,
-         result->grad);
+  if (!result || !result->prev || !result->prev->inputs[0]) {
+    return;
+  }
+  
   result->prev->inputs[0]->grad +=
       exp(result->prev->inputs[0]->value) * result->grad;
 }
-OperationNode *exp_(Parameter *p1, Parameter *result)
-{
 
+adam_error_t exp_(Parameter *p1, Parameter *result)
+{
+  if (!p1 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
   OperationNode *exp_node = malloc(sizeof(OperationNode));
-  if (p1 == NULL) {
-    printf("Uninitialized or NULL parameter p1");
-    exit(1);
+  if (!exp_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
-  if (result == NULL) {
-    printf("Uninitialized or NULL parameter result");
-    exit(1);
+  
+  exp_node->inputs = malloc(sizeof(Parameter *) * 1);
+  if (!exp_node->inputs) {
+    free(exp_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
   }
+  
   exp_node->_op_name = EXP;
   exp_node->_op_type = UNARY;
   exp_node->backward_fn = exp_grad;
-  exp_node->inputs = malloc(sizeof(Parameter *) * 1);
   exp_node->inputs[0] = p1;
   exp_node->n_inputs = 1;
 
@@ -271,21 +322,40 @@ OperationNode *exp_(Parameter *p1, Parameter *result)
   result->grad = 0.0;
   result->visited = 0;
   result->exponent = 1;
-  return exp_node;
+  
+  return ADAM_SUCCESS;
 }
 
 void tanh_grad(Parameter *result)
 {
+  if (!result || !result->prev || !result->prev->inputs[0]) {
+    return;
+  }
+  
   float tanh_value = tanh(result->prev->inputs[0]->value);
   result->prev->inputs[0]->grad += result->grad * (1 - tanh_value * tanh_value);
 }
-OperationNode *tanh_(Parameter *p1, Parameter *result)
+
+adam_error_t tanh_(Parameter *p1, Parameter *result)
 {
+  if (!p1 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
   OperationNode *tanh_node = malloc(sizeof(OperationNode));
+  if (!tanh_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
+  }
+  
+  tanh_node->inputs = malloc(sizeof(Parameter *) * 1);
+  if (!tanh_node->inputs) {
+    free(tanh_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
+  }
+  
   tanh_node->_op_name = TANH;
   tanh_node->_op_type = UNARY;
   tanh_node->backward_fn = tanh_grad;
-  tanh_node->inputs = malloc(sizeof(Parameter *) * 1);
   tanh_node->inputs[0] = p1;
   tanh_node->n_inputs = 1;
 
@@ -294,22 +364,41 @@ OperationNode *tanh_(Parameter *p1, Parameter *result)
   result->grad = 0.0;
   result->visited = 0;
   result->prev = tanh_node;
-  return tanh_node;
+  
+  return ADAM_SUCCESS;
 }
 
 void relu_grad(Parameter *result)
 {
+  if (!result || !result->prev || !result->prev->inputs[0]) {
+    return;
+  }
+  
   float val = result->prev->inputs[0]->value;
   float relu_deriv = val > 0.0 ? 1.0 : 0.0;
   result->prev->inputs[0]->grad += result->grad * (relu_deriv);
 }
-OperationNode *relu_(Parameter *p1, Parameter *result)
+
+adam_error_t relu_(Parameter *p1, Parameter *result)
 {
+  if (!p1 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+  
   OperationNode *relu_node = malloc(sizeof(OperationNode));
+  if (!relu_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
+  }
+  
+  relu_node->inputs = malloc(sizeof(Parameter *) * 1);
+  if (!relu_node->inputs) {
+    free(relu_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
+  }
+  
   relu_node->_op_name = RELU;
   relu_node->_op_type = UNARY;
   relu_node->backward_fn = relu_grad;
-  relu_node->inputs = malloc(sizeof(Parameter *) * 1);
   relu_node->inputs[0] = p1;
   relu_node->n_inputs = 1;
 
@@ -318,7 +407,7 @@ OperationNode *relu_(Parameter *p1, Parameter *result)
   result->grad = 0.0;
   result->visited = 0;
   result->prev = relu_node;
-  return relu_node;
+  
+  return ADAM_SUCCESS;
 }
 
-void matmul(Tensor *t1, Tensor *t2) {}

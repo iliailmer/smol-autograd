@@ -2,13 +2,70 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void _free_parameter_graph_recursive(Parameter *p, int cleanup_id);
+
 void init_parameter(Parameter *p, float value)
 {
   p->value = value;
   p->grad = 0.0;
   p->prev = NULL;
   p->visited = 0;
+  p->cleanup_visited = 0;
+  p->export_visited = 0;
   p->exponent = 1;
+}
+
+void free_operation_node(OperationNode *node)
+{
+  if (!node)
+    return;
+
+  if (node->inputs) {
+    free(node->inputs);
+  }
+  free(node);
+}
+
+void free_parameter_graph(Parameter *p)
+{
+  if (!p)
+    return;
+
+  // Use a separate visited flag for cleanup to avoid interfering with
+  // computation
+  static int cleanup_id = 0;
+  cleanup_id++;
+
+  _free_parameter_graph_recursive(p, cleanup_id);
+}
+
+static void _free_parameter_graph_recursive(Parameter *p, int cleanup_id)
+{
+  if (!p || p->cleanup_visited == cleanup_id)
+    return;
+
+  p->cleanup_visited = cleanup_id;
+
+  if (p->prev) {
+    for (size_t i = 0; i < p->prev->n_inputs; i++) {
+      _free_parameter_graph_recursive(p->prev->inputs[i], cleanup_id);
+    }
+    free_operation_node(p->prev);
+    p->prev = NULL;
+  }
+}
+
+void reset_export_visited(Parameter *p)
+{
+  if (!p || p->export_visited == 0) return;
+  
+  p->export_visited = 0;
+  
+  if (p->prev) {
+    for (size_t i = 0; i < p->prev->n_inputs; i++) {
+      reset_export_visited(p->prev->inputs[i]);
+    }
+  }
 }
 
 int export_to_dot(Parameter *p, FILE *f, int *global_id)
@@ -16,7 +73,14 @@ int export_to_dot(Parameter *p, FILE *f, int *global_id)
   if (!p)
     return -1;
 
+  // Check if this parameter was already exported
+  if (p->export_visited > 0) {
+    return p->export_visited; // Return the previously assigned ID
+  }
+
   int my_id = (*global_id)++;
+  p->export_visited = my_id; // Mark as visited with its ID
+  
   fprintf(f, "  node%d [label=\"value=%.2f, grad=%.2f\"];\n", my_id, p->value,
           p->grad);
 
@@ -83,13 +147,21 @@ void topo_sort(Parameter *p, Parameter **sorted, int *index)
   (*index)++;
 }
 
-void backward(Parameter *p)
+adam_error_t backward(Parameter *p)
 {
+  if (!p)
+    return ADAM_ERROR_NULL_POINTER;
+
   Parameter *sorted[MAX_GRAPH_SIZE];
   int idx = 0;
   topo_sort(p, sorted, &idx);
+
+  if (idx >= MAX_GRAPH_SIZE) {
+    return ADAM_ERROR_GRAPH_TOO_LARGE;
+  }
+
   p->grad = 1.0; // dp/dp
-  printf("idx=%d\n", idx);
+
   // traverse in reverse
   for (int i = idx - 1; i >= 0; i--) {
     if (sorted[i]->prev &&
@@ -97,87 +169,29 @@ void backward(Parameter *p)
       sorted[i]->prev->backward_fn(sorted[i]);
     }
   }
+
+  return ADAM_SUCCESS;
 }
 
-void save_graph(Parameter *p, const char *filename)
+adam_error_t save_graph(Parameter *p, const char *filename)
 {
+  if (!p || !filename)
+    return ADAM_ERROR_NULL_POINTER;
+
   FILE *f = fopen(filename, "w");
+  if (!f)
+    return ADAM_ERROR_INVALID_INPUT;
+
   fprintf(f, "digraph G {\n  rankdir=BT;\n");
+
+  // Reset export visited flags to ensure clean export
+  reset_export_visited(p);
 
   int global_id = 0;
   export_to_dot(p, f, &global_id);
 
   fprintf(f, "}\n");
   fclose(f);
-}
 
-int main(int argc, char *argv[])
-{
-  Parameter w1[2][2], w2[2][2], b1[2], b2[2], x[2], y[2], y_hat[2];
-  Parameter h1[2];
-  init_parameter(&y[0], 1.0);
-  init_parameter(&y[1], 4.0);
-  init_parameter(&y_hat[0], 1.0);
-  init_parameter(&y_hat[1], 4.0);
-  init_parameter(&x[0], 1.0);
-  init_parameter(&x[1], 2.0);
-  for (size_t i = 0; i < 2; i++) {
-    init_parameter(&b1[i], 1.0);
-    init_parameter(&b2[i], 1.0);
-    init_parameter(&h1[i], 1.0);
-    for (size_t j = 0; j < 2; j++) {
-      init_parameter(&w1[i][j], 1.0);
-      init_parameter(&w2[i][j], 1.0);
-    }
-  }
-  // forward pass
-  // first layer
-  for (size_t i = 0; i < 2; i++) {
-    Parameter sum;
-    init_parameter(&sum, 0.0); // sum = 0
-    for (size_t j = 0; j < 2; j++) {
-      Parameter prod;
-      init_parameter(&prod, 0.0);
-      mult(&w1[i][j], &x[j], &prod); // prod =  w[i,j] * x[j]
-      Parameter new_sum;
-      init_parameter(&new_sum, 0.0);
-      add(&prod, &sum, &new_sum);
-      sum = new_sum; // safe copy
-    }
-    Parameter biased_sum;
-    add(&sum, &b1[i], &biased_sum);
-    tanh_(&biased_sum, &h1[i]);
-  }
-  // second layer
-
-  for (size_t i = 0; i < 2; i++) {
-    Parameter sum;
-    init_parameter(&sum, 0.0); // sum = 0
-    for (size_t j = 0; j < 2; j++) {
-      Parameter prod;
-      init_parameter(&prod, 0.0);
-      mult(&w2[i][j], &h1[j], &prod); // prod =  w[i,j] * x[j]
-      Parameter new_sum;
-      init_parameter(&new_sum, 0.0);
-      add(&prod, &sum, &new_sum);
-      sum = new_sum; // safe copy
-    }
-    add(&sum, &b2[i], &y_hat[i]); // y_hat[i] = sum + b2[i]
-  }
-
-  // calculate loss
-  Parameter loss;
-  init_parameter(&loss, 0.0f);
-  for (size_t i = 0; i < 2; i++) {
-    Parameter diff;
-    sub(&y[i], &y_hat[i], &diff);
-    Parameter pow_diff;
-    power(&diff, 2, &pow_diff);
-    Parameter new_loss;
-    add(&loss, &pow_diff, &new_loss);
-    loss = new_loss;
-  }
-  backward(&loss);
-  save_graph(&loss, "graph.dot");
-  return EXIT_SUCCESS;
+  return ADAM_SUCCESS;
 }
