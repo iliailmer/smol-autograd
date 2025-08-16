@@ -5,24 +5,21 @@
 int main(int argc, char *argv[])
 {
   adam_error_t err;
-  
-  // Test quadratic polynomial: f(x) = x² + x
-  // Only x should accumulate gradients, no constants
+
   Parameter x, x_squared, result;
-  
+
   printf("Initializing parameters...\n");
   init_parameter(&x, 3.0);
-  
+
   printf("Computing: f(x) = x² + x where x=%.1f\n", x.value);
-  
-  // x_squared = x * x (shared parameter x)
+
   err = mult(&x, &x, &x_squared);
   if (err != ADAM_SUCCESS) {
     fprintf(stderr, "Error in x*x: %d\n", err);
     return err;
   }
   printf("x² = %.1f\n", x_squared.value);
-  
+
   // result = x_squared + x (x is reused again)
   err = add(&x_squared, &x, &result);
   if (err != ADAM_SUCCESS) {
@@ -40,8 +37,8 @@ int main(int argc, char *argv[])
   }
 
   printf("Backward pass completed successfully.\n");
-  printf("Gradient: x.grad=%.1f (should be df/dx = 2x + 1 = %.1f)\n", 
-         x.grad, 2*x.value + 1);
+  printf("Gradient: x.grad=%.1f (should be df/dx = 2x + 1 = %.1f)\n", x.grad,
+         2 * x.value + 1);
 
   err = save_graph(&result, "quadratic_graph.dot");
   if (err != ADAM_SUCCESS) {

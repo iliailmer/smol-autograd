@@ -57,10 +57,11 @@ static void _free_parameter_graph_recursive(Parameter *p, int cleanup_id)
 
 void reset_export_visited(Parameter *p)
 {
-  if (!p || p->export_visited == 0) return;
-  
+  if (!p || p->export_visited == 0)
+    return;
+
   p->export_visited = 0;
-  
+
   if (p->prev) {
     for (size_t i = 0; i < p->prev->n_inputs; i++) {
       reset_export_visited(p->prev->inputs[i]);
@@ -80,7 +81,7 @@ int export_to_dot(Parameter *p, FILE *f, int *global_id)
 
   int my_id = (*global_id)++;
   p->export_visited = my_id; // Mark as visited with its ID
-  
+
   fprintf(f, "  node%d [label=\"value=%.2f, grad=%.2f\"];\n", my_id, p->value,
           p->grad);
 

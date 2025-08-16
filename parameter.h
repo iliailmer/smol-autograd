@@ -7,12 +7,12 @@
 #define T2D(t, i, j) (t->data[(i) * (t)->cols + (j)])
 
 typedef enum {
-    ADAM_SUCCESS = 0,
-    ADAM_ERROR_NULL_POINTER = -1,
-    ADAM_ERROR_DIVISION_BY_ZERO = -2,
-    ADAM_ERROR_MEMORY_ALLOCATION = -3,
-    ADAM_ERROR_INVALID_INPUT = -4,
-    ADAM_ERROR_GRAPH_TOO_LARGE = -5
+  ADAM_SUCCESS = 0,
+  ADAM_ERROR_NULL_POINTER = -1,
+  ADAM_ERROR_DIVISION_BY_ZERO = -2,
+  ADAM_ERROR_MEMORY_ALLOCATION = -3,
+  ADAM_ERROR_INVALID_INPUT = -4,
+  ADAM_ERROR_GRAPH_TOO_LARGE = -5
 } adam_error_t;
 
 typedef enum { BINARY, UNARY } op_type;
@@ -22,10 +22,12 @@ typedef struct Parameter {
   float value;
   float grad;
   struct OperationNode *prev;
-  int visited;  // will be used for topological sort;
-  int cleanup_visited; // for memory cleanup to avoid interfering with computation
-  int export_visited; // for graph export to avoid infinite recursion
-  int exponent; // for the pow operation
+  int visited;         // will be used for topological sort;
+  int cleanup_visited; // for memory cleanup to avoid interfering with
+                       // computation
+  int export_visited;  // for graph export to avoid infinite recursion
+  int exponent;        // for the pow operation
+  int requires_grad;
 } Parameter;
 
 typedef struct Tensor {
