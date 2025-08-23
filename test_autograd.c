@@ -46,6 +46,8 @@ int main(int argc, char *argv[])
     return err;
   }
 
+  free_parameter_graph(&result);
+
   printf("Graph saved to quadratic_graph.dot\n");
 
   return EXIT_SUCCESS;

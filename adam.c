@@ -19,36 +19,33 @@ float adam(float a, float b, float c, float d, float x, float lr, float beta1,
   float m_hat = 0;
   float v = 0;
   float v_hat = 0;
-  int t = 0;
+  float beta1_power = beta1; // beta1^t
+  float beta2_power = beta2; // beta2^t
   float grad = 0;
+
   for (int iter = 0; iter < num_iter; iter++) {
-    t += 1;
     grad = grad_target_(a, b, c, d, x);
     m = beta1 * m + (1 - beta1) * grad;
     v = beta2 * v + (1 - beta2) * grad * grad;
-    m_hat = m / (1 - pow(beta1, t));
-    v_hat = v / (1 - pow(beta2, t));
+
+    // Use cached powers instead of expensive pow() calls
+    m_hat = m / (1 - beta1_power);
+    v_hat = v / (1 - beta2_power);
+
     x = x - lr * m_hat / (sqrt(v_hat) + eps);
-    printf("%e, f(%e)=%e\n", x, x, target_(a, b, c, d, x));
+
+    // Check for convergence
+    float curr_val = target_(a, b, c, d, x);
+    printf("%e, f(%e)=%e\n", x, x, curr_val);
+
+    if (fabs(grad) < tol) {
+      printf("Converged after %d iterations\n", iter + 1);
+      break;
+    }
+
+    // Update powers for next iteration
+    beta1_power *= beta1;
+    beta2_power *= beta2;
   }
   return x;
-}
-
-int main(int argc, char *argv[])
-{
-  float a, b, c, d, x;
-  a = 1;
-  b = -2;
-  c = -1;
-  d = 4;
-  x = 0;
-  float lr = 0.1;
-  float beta1 = 0.9;
-  float beta2 = 0.999;
-  int num_iter = 100;
-  float tol = 0.00001;
-  float eps = 1e-8;
-  x = adam(a, b, c, d, x, lr, beta1, beta2, num_iter, tol, eps);
-  printf("\n\n\n\t\t\tResult: %e, f(%e)=%e", x, x, target_(a, b, c, d, x));
-  return EXIT_SUCCESS;
 }
