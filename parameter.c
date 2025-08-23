@@ -113,6 +113,9 @@ int export_to_dot(Parameter *p, FILE *f, int *global_id)
     case RELU:
       label = "relu";
       break;
+    case SIGMOID:
+      label = "sigmoid";
+      break;
     case EXP:
       label = "exp";
       break;

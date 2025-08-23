@@ -16,7 +16,7 @@ typedef enum {
 } adam_error_t;
 
 typedef enum { BINARY, UNARY } op_type;
-typedef enum { ADD, SUB, NEG, MUL, DIV, POW, EXP, TANH, RELU } op_name;
+typedef enum { ADD, SUB, NEG, MUL, DIV, POW, EXP, TANH, RELU, SIGMOID } op_name;
 
 typedef struct Parameter {
   float value;
@@ -62,6 +62,7 @@ adam_error_t power(Parameter *p1, int exponent, Parameter *result);
 adam_error_t exp_(Parameter *p1, Parameter *result);
 adam_error_t tanh_(Parameter *p1, Parameter *result);
 adam_error_t relu_(Parameter *p1, Parameter *result);
+adam_error_t sigmoid_(Parameter *p1, Parameter *result);
 
 adam_error_t backward(Parameter *p);
 adam_error_t save_graph(Parameter *p, const char *filename);
@@ -71,4 +72,10 @@ float target_(float a, float b, float c, float d, float x);
 float grad_target_(float a, float b, float c, float d, float x);
 float adam(float a, float b, float c, float d, float x, float lr, float beta1,
            float beta2, int num_iter, float tol, float eps);
+adam_error_t adam_optimizer(Parameter **params, int n_params, float lr, 
+                           float beta1, float beta2, int num_iter, 
+                           float tol, float eps);
+void print_parameters(const char *title, Parameter **params, int n_params);
+void print_mlp_parameters(Parameter w[2][2], Parameter b[2]);
+void zero_grad(Parameter **params, int n_params);
 #endif

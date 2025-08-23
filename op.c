@@ -410,3 +410,46 @@ adam_error_t relu_(Parameter *p1, Parameter *result)
 
   return ADAM_SUCCESS;
 }
+
+void sigmoid_grad(Parameter *result)
+{
+  if (!result || !result->prev || !result->prev->inputs[0]) {
+    return;
+  }
+
+  float sigmoid_val = result->value;
+  float sigmoid_deriv = sigmoid_val * (1.0f - sigmoid_val);
+  result->prev->inputs[0]->grad += result->grad * sigmoid_deriv;
+}
+
+adam_error_t sigmoid_(Parameter *p1, Parameter *result)
+{
+  if (!p1 || !result) {
+    return ADAM_ERROR_NULL_POINTER;
+  }
+
+  OperationNode *sigmoid_node = malloc(sizeof(OperationNode));
+  if (!sigmoid_node) {
+    return ADAM_ERROR_MEMORY_ALLOCATION;
+  }
+
+  sigmoid_node->inputs = malloc(sizeof(Parameter *) * 1);
+  if (!sigmoid_node->inputs) {
+    free(sigmoid_node);
+    return ADAM_ERROR_MEMORY_ALLOCATION;
+  }
+
+  sigmoid_node->_op_name = SIGMOID;
+  sigmoid_node->_op_type = UNARY;
+  sigmoid_node->backward_fn = sigmoid_grad;
+  sigmoid_node->inputs[0] = p1;
+  sigmoid_node->n_inputs = 1;
+
+  result->value = 1.0f / (1.0f + expf(-p1->value));
+  result->exponent = 1;
+  result->grad = 0.0f;
+  result->visited = 0;
+  result->prev = sigmoid_node;
+
+  return ADAM_SUCCESS;
+}
