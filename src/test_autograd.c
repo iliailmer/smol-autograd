@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
   printf("Gradient: x.grad=%.1f (should be df/dx = 2x + 1 = %.1f)\n", x.grad,
          2 * x.value + 1);
 
-  err = save_graph(&result, "quadratic_graph.dot");
+  err = save_graph(&result, "build/quadratic_graph.dot");
   if (err != ADAM_SUCCESS) {
     fprintf(stderr, "Error saving graph: %d\n", err);
     return err;
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 
   free_parameter_graph(&result);
 
-  printf("Graph saved to quadratic_graph.dot\n");
+  printf("Graph saved to build/quadratic_graph.dot\n");
 
   return EXIT_SUCCESS;
 }

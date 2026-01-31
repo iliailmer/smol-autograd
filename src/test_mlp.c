@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
          new_result.value,
          100.0f * (result.value - new_result.value) / result.value);
 
-  err = save_graph(&new_result, "mlp_graph.dot");
+  err = save_graph(&new_result, "build/mlp_graph.dot");
   if (err != ADAM_SUCCESS) {
     fprintf(stderr, "Error saving graph: %d\n", err);
     return err;
