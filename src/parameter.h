@@ -72,9 +72,9 @@ float target_(float a, float b, float c, float d, float x);
 float grad_target_(float a, float b, float c, float d, float x);
 float adam(float a, float b, float c, float d, float x, float lr, float beta1,
            float beta2, int num_iter, float tol, float eps);
-adam_error_t adam_optimizer(Parameter **params, int n_params, float lr, 
-                           float beta1, float beta2, int num_iter, 
-                           float tol, float eps);
+adam_error_t adam_optimizer(Parameter **params, int n_params, float lr,
+                            float beta1, float beta2, int num_iter, float tol,
+                            float eps);
 void print_parameters(const char *title, Parameter **params, int n_params);
 void print_mlp_parameters(Parameter w[2][2], Parameter b[2]);
 void zero_grad(Parameter **params, int n_params);
