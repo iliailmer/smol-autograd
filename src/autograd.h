@@ -1,6 +1,7 @@
 #ifndef AUTOGRAD_H
 #define AUTOGRAD_H
 #include <stddef.h>
+#define DUMP(varname) fprintf(stderr, "%s = %x", #varname, varname);
 typedef enum {
   op_leaf = -1,
   op_add = 0,
@@ -36,13 +37,26 @@ typedef struct Parameter {
   int n_inputs;
   // op_descriptor op_desc;
   int visited;
+  char *name;
 } Parameter;
 
-void init_0d(Parameter *p);
-void init_1d(Parameter *p, size_t width);
-void free_parameter(Parameter *a);
+typedef struct {
+  size_t cap;
+  size_t len;
+  Parameter **params;
+} dyn_array;
+
+// dynamic array
+
+void dyn_array_init(dyn_array *da);
+void dyn_array_append(dyn_array *da, Parameter *p);
+void dyn_array_append(dyn_array *da, Parameter *p);
+
+// Parameter
+void init_0d(Parameter *p, char *name);
+void init_1d(Parameter *p, size_t width, char *name);
+void free_parameter(Parameter *p);
 void print_parameter(Parameter *p);
-// op_descriptor init_op(op_code op);
 
 // operations
 void add_0d(Parameter *a, Parameter *b, Parameter *output);
@@ -54,9 +68,12 @@ void mul_1d(Parameter *a, Parameter *b, Parameter *output);
 // gradients
 void zero_grad(Parameter *p);
 
+// backward
 void add_0d_backward(Parameter *a);
 void add_1d_backward(Parameter *a);
 
 void mul_0d_backward(Parameter *a);
 void mul_1d_backward(Parameter *a);
+
+void topo_sort(Parameter *p, dyn_array *topo);
 #endif
