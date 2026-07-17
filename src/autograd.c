@@ -2,7 +2,11 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-// TODO: global backward method
+
+static size_t param_size(const Parameter *p) {
+  return p->rank == Scalar ? 1 : p->shape[0];
+}
+
 void init_0d(Parameter *p, char *name) {
   p->data = (float *)calloc(1, sizeof(float));
   p->grad = (float *)calloc(1, sizeof(float));
@@ -13,7 +17,9 @@ void init_0d(Parameter *p, char *name) {
   p->shape = NULL;
   p->name = name;
   p->visited = 0;
+  p->backward = NULL;
 }
+
 void init_1d(Parameter *p, size_t width, char *name) {
   p->data = (float *)calloc(width, sizeof(float));
   p->grad = (float *)calloc(width, sizeof(float));
@@ -25,70 +31,47 @@ void init_1d(Parameter *p, size_t width, char *name) {
   p->shape[0] = width;
   p->name = name;
   p->visited = 0;
+  p->backward = NULL;
 }
 
-void add_0d(Parameter *a, Parameter *b, Parameter *output) {
-  output->data[0] = a->data[0] + b->data[0];
-  output->inputs = malloc(2 * sizeof(Parameter *));
-  output->inputs[0] = a;
-  output->inputs[1] = b;
-  output->n_inputs = 2;
-  output->op = op_add;
+static void add_backward(Parameter *p) {
+  size_t n = param_size(p);
+  for (size_t i = 0; i < n; i++) {
+    p->inputs[0]->grad[i] += p->grad[i];
+    p->inputs[1]->grad[i] += p->grad[i];
+  }
 }
 
-void add_0d_backward(Parameter *a) {
-  a->inputs[0]->grad[0] += a->grad[0];
-  a->inputs[1]->grad[0] += a->grad[0];
-};
-
-void mul_0d(Parameter *a, Parameter *b, Parameter *output) {
-  output->data[0] = a->data[0] * b->data[0];
-  output->inputs = malloc(2 * sizeof(Parameter *));
-  output->inputs[0] = a;
-  output->inputs[1] = b;
-  output->n_inputs = 2;
-  output->op = op_mul;
+static void mul_backward(Parameter *p) {
+  size_t n = param_size(p);
+  for (size_t i = 0; i < n; i++) {
+    p->inputs[0]->grad[i] += p->grad[i] * p->inputs[1]->data[i];
+    p->inputs[1]->grad[i] += p->grad[i] * p->inputs[0]->data[i];
+  }
 }
 
-void mul_0d_backward(Parameter *a) {
-  a->inputs[0]->grad[0] += a->grad[0] * a->inputs[1]->data[0];
-  a->inputs[1]->grad[0] += a->grad[0] * a->inputs[0]->data[0];
-};
-
-void add_1d(Parameter *a, Parameter *b, Parameter *output) {
-  for (size_t i = 0; i < output->shape[0]; i++) {
+void add(Parameter *a, Parameter *b, Parameter *output) {
+  size_t n = param_size(output);
+  for (size_t i = 0; i < n; i++)
     output->data[i] = a->data[i] + b->data[i];
-  }
   output->inputs = malloc(2 * sizeof(Parameter *));
   output->inputs[0] = a;
   output->inputs[1] = b;
   output->n_inputs = 2;
   output->op = op_add;
+  output->backward = add_backward;
 }
 
-void add_1d_backward(Parameter *a) {
-  for (size_t i = 0; i < a->shape[0]; i++) {
-    a->inputs[0]->grad[i] += a->grad[i];
-    a->inputs[1]->grad[i] += a->grad[i];
-  }
-}
-
-void mul_1d(Parameter *a, Parameter *b, Parameter *output) {
-  for (size_t i = 0; i < output->shape[0]; i++) {
+void mul(Parameter *a, Parameter *b, Parameter *output) {
+  size_t n = param_size(output);
+  for (size_t i = 0; i < n; i++)
     output->data[i] = a->data[i] * b->data[i];
-  }
   output->inputs = malloc(2 * sizeof(Parameter *));
   output->inputs[0] = a;
   output->inputs[1] = b;
   output->n_inputs = 2;
   output->op = op_mul;
-}
-
-void mul_1d_backward(Parameter *a) {
-  for (size_t i = 0; i < a->shape[0]; i++) {
-    a->inputs[0]->grad[i] += a->grad[i] * a->inputs[1]->data[i];
-    a->inputs[1]->grad[i] += a->grad[i] * a->inputs[0]->data[i];
-  }
+  output->backward = mul_backward;
 }
 
 static const char *op_code_name(op_code op) {
@@ -109,6 +92,35 @@ static const char *op_code_name(op_code op) {
     return "exp";
   }
   return "unknown";
+}
+
+static void print_node_inline(const Parameter *p) {
+  if (p->rank == Scalar)
+    printf("%s [%s  data=%.2f  grad=%.2f]", p->name, op_code_name(p->op),
+           p->data[0], p->grad[0]);
+  else
+    printf("%s [%s  data=%.2f...  grad=%.2f...]", p->name, op_code_name(p->op),
+           p->data[0], p->grad[0]);
+}
+
+static void print_graph_impl(const Parameter *p, const char *prefix,
+                              int is_last) {
+  printf("%s%s", prefix, is_last ? "└── " : "├── ");
+  print_node_inline(p);
+  printf("\n");
+
+  char child_prefix[256];
+  snprintf(child_prefix, sizeof(child_prefix), "%s%s", prefix,
+           is_last ? "    " : "│   ");
+  for (int i = 0; i < p->n_inputs; i++)
+    print_graph_impl(p->inputs[i], child_prefix, i == p->n_inputs - 1);
+}
+
+void print_graph(const Parameter *p) {
+  print_node_inline(p);
+  printf("\n");
+  for (int i = 0; i < p->n_inputs; i++)
+    print_graph_impl(p->inputs[i], "", i == p->n_inputs - 1);
 }
 
 void print_parameter(Parameter *p) {
@@ -140,49 +152,45 @@ void zero_grad(Parameter *p) {
 void dyn_array_init(dyn_array *da) {
   da->cap = 1;
   da->len = 0;
-  da->params = (Parameter **)malloc(da->cap * sizeof(Parameter));
-  for (size_t i = 0; i < da->len; i++) {
-    da->params[i] = (Parameter *)malloc(sizeof(Parameter));
-  }
+  da->params = (Parameter **)malloc(da->cap * sizeof(Parameter *));
 };
 
-void dyn_array_free(dyn_array *da) {
+void dyn_array_free(dyn_array *da) { free(da->params); }
+
+void dyn_array_display(dyn_array *da) {
+  printf("len: %lu; cap: %lu\n", da->len, da->cap);
   for (size_t i = 0; i < da->len; i++) {
-    free(da->params[i]);
+    print_parameter(da->params[i]);
   }
-  free(da->params);
-  free(da);
 }
 
 void dyn_array_append(dyn_array *da, Parameter *p) {
-  if (da->len < da->cap) {
-    da->len += 1;
-    da->params[da->len - 1] = p;
-  } else {
+  if (da->len >= da->cap) {
     da->cap = da->cap * 2;
-    Parameter **tmp = realloc(da->params, da->cap * sizeof(Parameter));
+    Parameter **tmp = realloc(da->params, da->cap * sizeof(Parameter *));
     da->params = tmp;
-    da->len += 1;
-    da->params[da->len - 1] = p;
   }
+  da->params[da->len++] = p;
 }
+
 void topo_sort(Parameter *p, dyn_array *topo) {
   p->visited = 1;
-  for (size_t i = 0; i < p->n_inputs; i++) {
-    if (p->inputs[i]->visited == 0) {
+  for (int i = 0; i < p->n_inputs; i++) {
+    if (p->inputs[i]->visited == 0)
       topo_sort(p->inputs[i], topo);
-    }
   }
   dyn_array_append(topo, p);
 }
 
 void backward(dyn_array *topo) {
-  for (size_t i = topo->len - 1; i >= 0; i--) {
-    // TODO: need to figure out how to dispatch the correct
-    // backward function based on op code and inputs into
-    // params[i]; Possibly a switch?
-    // switch (topo->params[i]->op) {
-    // case (op_add):
+  if (topo->len == 0) return;
+  size_t n = param_size(topo->params[topo->len - 1]);
+  for (size_t i = 0; i < n; i++)
+    topo->params[topo->len - 1]->grad[i] = 1.0f;
+  for (int i = (int)topo->len - 1; i >= 0; i--) {
+    Parameter *p = topo->params[i];
+    if (p->backward != NULL)
+      p->backward(p);
   }
 }
 
