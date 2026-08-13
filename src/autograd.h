@@ -10,6 +10,7 @@ typedef enum {
   op_sub = 3,
   op_pow = 4,
   op_exp = 5,
+  op_matmul = 6,
 } op_code;
 
 typedef enum { Scalar = 0, Vector = 1, Matrix = 2 } tensor_rank;
@@ -19,6 +20,7 @@ typedef void (*backward_fn)(Parameter *p);
 struct Parameter {
   float *data;
   float *grad;
+  float exponent;
   tensor_rank rank;
   size_t *shape;
   op_code op;
@@ -44,14 +46,17 @@ void dyn_array_display(dyn_array *da);
 // Parameter
 void init_0d(Parameter *p, char *name);
 void init_1d(Parameter *p, size_t width, char *name);
+void init_2d(Parameter *p, size_t rows, size_t cols, char *name);
 void free_parameter(Parameter *p);
 void print_parameter(Parameter *p);
 void print_graph(const Parameter *p);
 
 // operations
 void add(Parameter *a, Parameter *b, Parameter *output);
+void sub(Parameter *a, Parameter *b, Parameter *output);
 void mul(Parameter *a, Parameter *b, Parameter *output);
-
+void matmul(Parameter *a, Parameter *b, Parameter *output);
+void pow_(Parameter *a, float b, Parameter *output);
 // gradients
 void zero_grad(Parameter *p);
 
